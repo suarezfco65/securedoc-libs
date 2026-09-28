@@ -16,12 +16,13 @@
   var MAX_RETROCESO_DIAS = 7; // Si es feriado/sin dato, busca hacia atrás hasta 7 días.
 
   // Tipos aceptados -> ruta {moneda}/{fuente} del servicio.
-  // Se normaliza a minúsculas y sin acentos para que "Oficial", "oficial",
-  // "Euro", "euro", "Libre", "libre" funcionen indistintamente.
+  // Las claves están normalizadas (minúsculas, sin acentos) y se aceptan
+  // varios sinónimos ("libre" = "paralelo", "usd" = "dolar", "eur" = "euro").
   var MAPA_TIPOS = {
-    "oficial": { moneda: "dolares", fuente: "oficial" },
-    "euro":    { moneda: "euros",   fuente: "oficial" },
-    "libre":   { moneda: "dolares", fuente: "paralelo" }
+    "dolar oficial":  { moneda: "dolares", fuente: "oficial" },
+    "dolar libre":    { moneda: "dolares", fuente: "paralelo" },
+    "euro oficial":   { moneda: "euros",   fuente: "oficial" },
+    "euro libre":     { moneda: "euros",   fuente: "paralelo" }
   };
 
   function normalizar(texto) {
@@ -29,7 +30,14 @@
       .trim()
       .toLowerCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, ""); // quita acentos
+      .replace(/[\u0300-\u036f]/g, "") // quita acentos
+      .replace(/\s+/g, " ")
+      // Sinónimos frecuentes -> forma canónica.
+      .replace(/\busd\b/g, "dolar")
+      .replace(/\bdolares\b/g, "dolar")
+      .replace(/\beur\b/g, "euro")
+      .replace(/\beuros\b/g, "euro")
+      .replace(/\bparalelo\b/g, "libre");
   }
 
   // Acepta: Date, "YYYY-MM-DD", "DD/MM/YYYY" o timestamp numérico.
@@ -111,7 +119,7 @@
   var TasaCambio = {
     // Lista de tipos válidos (por si la app quiere armar un selector).
     tipos: function () {
-      return ["Oficial", "Euro", "libre"];
+      return ["Dolar oficial", "Dolar libre", "Euro oficial", "Euro libre"];
     },
 
     /**
@@ -120,7 +128,8 @@
      * hasta un máximo de 7 días atrás y devuelve el primero que tenga tasa.
      *
      * @param {Date|string|number} fecha  Date, "YYYY-MM-DD", "DD/MM/YYYY" o timestamp.
-     * @param {string} tipo               "Oficial", "Euro" o "libre".
+     * @param {string} tipo               "Dolar oficial", "Dolar libre",
+     *                                     "Euro oficial" o "Euro libre".
      * @returns {Promise<Object>} {
      *            tipo, fechaSolicitada:"YYYY-MM-DD", fecha:"YYYY-MM-DD" (la usada),
      *            tasa:Number, diasRetrocedidos:Number, moneda, fuente, url
@@ -133,7 +142,10 @@
         var clave = normalizar(tipo);
         var cfg = MAPA_TIPOS[clave];
         if (!cfg) {
-          reject(new Error('Tipo no válido. Usa "Oficial", "Euro" o "libre".'));
+          reject(new Error(
+            'Tipo no válido. Usa "Dolar oficial", "Dolar libre", ' +
+            '"Euro oficial" o "Euro libre".'
+          ));
           return;
         }
 
